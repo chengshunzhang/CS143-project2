@@ -79,7 +79,15 @@ private[sql] class DiskPartition (
     * @param row the [[Row]] we are adding
     */
   def insert(row: Row) = {
-    /* IMPLEMENT THIS METHOD */
+    if (inputClosed) {
+      throw new SparkException("This partition has been closed!")
+    }
+
+    data.add(row)
+    if (measurePartitionSize() > blockSize) {
+      spillPartitionToDisk()
+      data.clear()
+    }
   }
 
   /**
@@ -122,13 +130,19 @@ private[sql] class DiskPartition (
       var byteArray: Array[Byte] = null
 
       override def next() = {
-        /* IMPLEMENT THIS METHOD */
-        null
+        if (currentIterator.hasNext) {
+          currentIterator.next()
+        } else {
+          throw new SparkException("Out of bound!")
+        }
       }
 
       override def hasNext() = {
-        /* IMPLEMENT THIS METHOD */
-        false
+        if (currentIterator.hasNext || fetchNextChunk()) {
+          true
+        } else {
+          false
+        }
       }
 
       /**
@@ -138,8 +152,13 @@ private[sql] class DiskPartition (
         * @return true unless the iterator is empty.
         */
       private[this] def fetchNextChunk(): Boolean = {
-        /* IMPLEMENT THIS METHOD */
-        false
+        if (chunkSizeIterator.hasNext) {
+          byteArray = getNextChunkBytes(inStream, chunkSizeIterator.next(), byteArray)
+          currentIterator = getListFromBytes(byteArray).iterator.asScala
+          true
+        } else {
+          false
+        }
       }
     }
   }
@@ -152,7 +171,10 @@ private[sql] class DiskPartition (
     * also be closed.
     */
   def closeInput() = {
-    /* IMPLEMENT THIS METHOD */
+    outStream.close()
+    if (data.size() > 0) {
+      spillPartitionToDisk()
+    }
     inputClosed = true
   }
 
