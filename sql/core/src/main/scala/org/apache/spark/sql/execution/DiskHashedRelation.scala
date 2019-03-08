@@ -212,7 +212,17 @@ private[sql] object DiskHashedRelation {
               keyGenerator: Projection,
               size: Int = 64,
               blockSize: Int = 64000) = {
-    /* IMPLEMENT THIS METHOD */
-    null
+    var partitions: Array[DiskPartition] = new Array[DiskPartition](size)
+    for (i <- 0 to partitions.length - 1) {
+      partitions(i) = new DiskPartition("partition" + i, blockSize)
+    }
+    for (row <- input) {
+      val hashValue = keyGenerator.apply(row).hashCode() % size
+      partitions(hashValue).insert(row)
+    }
+    for (diskPartition <- partitions) {
+      diskPartition.closeInput()
+    }
+    new GeneralDiskHashedRelation(partitions)
   }
 }
