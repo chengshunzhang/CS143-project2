@@ -229,13 +229,23 @@ object CachingIteratorGenerator {
       val cache: JavaHashMap[Row, Row] = new JavaHashMap[Row, Row]()
 
       def hasNext() = {
-        /* IMPLEMENT THIS METHOD */
-        false
+        input.hasNext
       }
 
       def next() = {
-        /* IMPLEMENT THIS METHOD */
-        null
+        if (hasNext) {
+          val row: Row = input.next
+          val key = cacheKeyProjection.apply(row)
+          val preRes = preUdfProjection.apply(row)
+          val postRes = postUdfProjection.apply(row)
+          if (!cache.containsKey(key)) {
+            cache.put(key, udfProject.apply(row))
+          }
+          val udfRes = cache.get(key)
+          Row.fromSeq(preRes ++ udfRes ++ postRes)
+        } else {
+          null
+        }
       }
     }
   }
